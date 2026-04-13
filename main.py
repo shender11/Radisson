@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import CommandStart
 
-TOKEN = "ВСТАВЬ_СЮДА_ТОКЕН_НОВОГО_БОТА"
+TOKEN = "8592854204:AAEI939vRdiyYEQPzQqoOsxrugOSJU8vzD0"
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -27,7 +27,7 @@ creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("ВСТАВЬ_СЮДА_ID_НОВОЙ_ТАБЛИЦЫ").sheet1
+sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").sheet1
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
