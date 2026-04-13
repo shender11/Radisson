@@ -10,10 +10,12 @@ from aiogram.filters import CommandStart
 import gspread
 from google.oauth2.service_account import Credentials
 
-# 🔴 ВСТАВЬ ID АДМИНА
-ADMIN_ID = 8183757534
+# 🔴 НАСТРОЙКИ
+ADMIN_ID = 8183757534        # ID админа команды
+OWNER_ID = 1826030998       # ТВОЙ ID (куда будут приходить все уведомления)
+TEAM_NAME = "Radisson"        # Название команды (меняешь под каждого бота)
 
-# 🔴 ВСТАВЬ ТОКЕН БОТА
+# 🔴 ТОКЕН БОТА
 TOKEN = "8592854204:AAEI939vRdiyYEQPzQqoOsxrugOSJU8vzD0"
 
 # Google доступ
@@ -32,7 +34,7 @@ creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
-# 🔴 ВСТАВЬ СВОЙ ID ТАБЛИЦЫ
+# 🔴 ID таблицы
 sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").sheet1
 
 bot = Bot(token=TOKEN)
@@ -64,12 +66,15 @@ async def handle(message: Message):
 
         await message.answer("Перерыв начат")
 
-        await bot.send_message(
-            ADMIN_ID,
-            f"Начал перерыв:\n"
+        text = (
+            f"[{TEAM_NAME}]\n"
+            f"🟡 Начал перерыв:\n"
             f"{message.from_user.full_name}\n"
             f"@{message.from_user.username if message.from_user.username else 'без username'}"
         )
+
+        await bot.send_message(ADMIN_ID, text)
+        await bot.send_message(OWNER_ID, text)
 
     # ✅ ЗАКОНЧИЛ ПЕРЕРЫВ
     elif message.text == "Закончить перерыв":
@@ -93,13 +98,16 @@ async def handle(message: Message):
             minutes
         ])
 
-        await bot.send_message(
-            ADMIN_ID,
-            f"Закончил перерыв:\n"
+        text = (
+            f"[{TEAM_NAME}]\n"
+            f"🟢 Закончил перерыв:\n"
             f"{message.from_user.full_name}\n"
             f"@{message.from_user.username if message.from_user.username else 'без username'}\n"
-            f"Длительность: {minutes} мин"
+            f"⏱ {minutes} мин"
         )
+
+        await bot.send_message(ADMIN_ID, text)
+        await bot.send_message(OWNER_ID, text)
 
         del break_data[user_id]
 
