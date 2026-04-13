@@ -48,6 +48,8 @@ keyboard = ReplyKeyboardMarkup(
 async def start(message: Message):
     await message.answer("Бот для учета перерывов", reply_markup=keyboard)
 
+    await bot.send_message(ADMIN_ID, "ТЕСТ СООБЩЕНИЕ")
+
 @dp.message()
 async def handle(message: Message):
     user_id = message.from_user.id
