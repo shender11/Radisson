@@ -3,6 +3,8 @@ import os
 import json
 from datetime import datetime
 
+ADMIN_ID = 8183757534
+
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -52,7 +54,15 @@ async def handle(message: Message):
 
     if message.text == "Начать перерыв":
         break_data[user_id] = datetime.now()
+        
         await message.answer("Перерыв начат")
+
+    await bot.send_message(
+        ADMIN_ID,
+        f"Начал перерыв:\n"
+        f"{message.from_user.full_name}\n"
+        f"@{message.from_user.username if message.from_user.username else 'без username'}"
+    )
 
     elif message.text == "Закончить перерыв":
 
@@ -73,6 +83,14 @@ async def handle(message: Message):
             now.strftime("%H:%M:%S"),
             minutes
         ])
+
+await bot.send_message(
+    ADMIN_ID,
+    f"Закончил перерыв:\n"
+    f"{message.from_user.full_name}\n"
+    f"@{message.from_user.username if message.from_user.username else 'без username'}\n"
+    f"Длительность: {minutes} мин"
+)
 
         del break_data[user_id]
 
