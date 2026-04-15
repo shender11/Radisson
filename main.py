@@ -10,7 +10,7 @@ from aiogram.filters import CommandStart
 import gspread
 from google.oauth2.service_account import Credentials
 
-# 🔴 НАСТРОЙКИ
+# НАСТРОЙКИ
 ADMIN_ID = 8183757534
 OWNER_ID = 1826030998
 TEAM_NAME = "Radisson"
@@ -22,8 +22,10 @@ scope = [
 ]
 
 creds_json = os.getenv("GOOGLE_CREDENTIALS")
-creds_dict = json.loads(creds_json)
+if not creds_json:
+    raise Exception("GOOGLE_CREDENTIALS не найден")
 
+creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
@@ -47,47 +49,44 @@ keyboard = ReplyKeyboardMarkup(
 async def start(message: Message):
     await message.answer("Бот учета перерывов", reply_markup=keyboard)
 
-# 🔥 КОНТРОЛЬ
-async def break_control(user_id, minutes, name, username):
-
+# КОНТРОЛЬ ПЕРЕРЫВА
+async def break_control(user_id: int, minutes: int, name: str, username: str | None):
     start_time = datetime.now()
     warned_5min = False
-    last_overdue_sent = -1
+    last_overdue_sent = 0
 
     while user_id in break_data:
-
         now = datetime.now()
         elapsed = (now - start_time).total_seconds() / 60
 
-        # ⏳ за 5 минут до конца
+        # За 5 минут до конца
         if not warned_5min and minutes > 5 and elapsed >= (minutes - 5):
             warned_5min = True
             await bot.send_message(user_id, "⏳ До конца перерыва осталось 5 минут")
 
-        # 🚨 каждую минуту после окончания
-        if elapsed >= minutes:
-            overdue = int(elapsed - minutes)
+        # Каждую минуту после окончания
+        overdue = int(elapsed - minutes)
 
-            if overdue != last_overdue_sent:
-                last_overdue_sent = overdue
+        if overdue > 0 and overdue != last_overdue_sent:
+            last_overdue_sent = overdue
 
-                text = (
-                    f"[{TEAM_NAME}]\n"
-                    f"🚨 ОПОЗДАНИЕ\n"
-                    f"{name}\n"
-                    f"@{username if username else 'без username'}\n"
-                    f"⏱ +{overdue} мин"
-                )
+            text = (
+                f"[{TEAM_NAME}]\n"
+                f"🚨 ОПОЗДАНИЕ\n"
+                f"{name}\n"
+                f"@{username if username else 'без username'}\n"
+                f"⏱ +{overdue} мин"
+            )
 
-                # админу и тебе
-                await bot.send_message(ADMIN_ID, text)
-                await bot.send_message(OWNER_ID, text)
+            # Админу и тебе
+            await bot.send_message(ADMIN_ID, text)
+            await bot.send_message(OWNER_ID, text)
 
-                # переводчику
-                await bot.send_message(
-                    user_id,
-                    f"🚨 Ты опаздываешь уже на {overdue} мин! Срочно возвращайся"
-                )
+            # Переводчику
+            await bot.send_message(
+                user_id,
+                f"🚨 Ты опаздываешь уже на {overdue} мин! Срочно возвращайся"
+            )
 
         await asyncio.sleep(10)
 
@@ -100,7 +99,6 @@ async def handle(message: Message):
         await message.answer("Напиши длительность (максимум 30 минут)")
 
     elif user_id in waiting_time:
-
         if not message.text.isdigit():
             await message.answer("Введи число")
             return
@@ -123,7 +121,8 @@ async def handle(message: Message):
         text = (
             f"[{TEAM_NAME}]\n"
             f"🟡 Начал перерыв ({minutes} мин)\n"
-            f"{message.from_user.full_name}"
+            f"{message.from_user.full_name}\n"
+            f"@{message.from_user.username if message.from_user.username else 'без username'}"
         )
 
         await bot.send_message(ADMIN_ID, text)
@@ -139,7 +138,6 @@ async def handle(message: Message):
         )
 
     elif message.text == "Закончить перерыв":
-
         if user_id not in break_data:
             await message.answer("Нет активного перерыва")
             return
@@ -161,7 +159,7 @@ async def handle(message: Message):
             f"[{TEAM_NAME}]\n"
             f"🟢 Закончил перерыв\n"
             f"{message.from_user.full_name}\n"
-            f"{minutes} мин"
+            f"⏱ {minutes} мин"
         )
 
         await bot.send_message(ADMIN_ID, text)
