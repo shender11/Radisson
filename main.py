@@ -1089,7 +1089,7 @@ async def cancel_day(callback: CallbackQuery):
 
 @dp.message(F.text == "/users")
 async def show_users(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
 
     if not users:
@@ -1105,7 +1105,7 @@ async def show_users(message: Message):
 
 @dp.message(F.text == "/today_stats")
 async def today_stats(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
 
     stats, late_users, dayoff_users = get_today_admin_stats()
@@ -1133,7 +1133,7 @@ async def today_stats(message: Message):
 
 @dp.message(F.text.startswith("/block"))
 async def block_user(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
 
     try:
@@ -1147,7 +1147,7 @@ async def block_user(message: Message):
 
 @dp.message(F.text.startswith("/unblock"))
 async def unblock_user(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
 
     try:
@@ -1160,7 +1160,7 @@ async def unblock_user(message: Message):
 
 @dp.message(F.text.startswith("/delete"))
 async def delete_user(message: Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
 
     try:
