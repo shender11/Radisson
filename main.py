@@ -385,18 +385,22 @@ load_blocked_users()
 
 
 
-def generate_calendar():
+def generate_calendar(year=None, month=None):
     now = datetime.now()
-    month = now.month
-    year = now.year
+
+    if year is None:
+        year = now.year
+    if month is None:
+        month = now.month
 
     records = days_off_sheet.get_all_values()
     buttons = []
 
     import calendar
-
-    days_in_month = calendar.monthrange(year, month)[1]
     
+    days_in_month = calendar.monthrange(year, month)[1]
+    limit = get_team_limit()
+
     for day in range(1, days_in_month + 1):
         try:
             date = datetime(year, month, day)
@@ -410,22 +414,20 @@ def generate_calendar():
             if len(r) > 1 and r[1] == date_str
         ]
 
-
         taken = len(same_day)
 
         if date.date() < now.date():
             text = f"⛔ {day}"
             callback = "ignore"
         else:
-            limit = get_team_limit()
-
             if taken >= limit:
                 text = f"🔴 {day}"
                 callback = "ignore"
             else:
                 left = limit - taken
                 text = f"{day} ({left})"
-                callback = f"day_{day}_{month}"
+                callback = f"day_{day}_{month}_{year}"
+
 
         buttons.append(
             InlineKeyboardButton(
@@ -434,7 +436,28 @@ def generate_calendar():
             )
         )
 
-    keyboard = [buttons[i:i+5] for i in range(0, len(buttons), 5)]
+    keyboard = [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
+
+    prev_month = month - 1
+    prev_year = year
+    if prev_month < 1:
+        prev_month = 12
+        prev_year -= 1
+
+    next_month = month + 1
+    next_year = year
+    if next_month > 12:
+        next_month = 1
+        next_year += 1
+
+    nav_row = [
+        InlineKeyboardButton(text="<-", callback_data=f"month_{prev_month}_{prev_year}"),
+        InlineKeyboardButton(text=f"{month:02d}.{year}", callback_data="ignore"),
+        InlineKeyboardButton(text="->", callback_data=f"month_{next_month}_{next_year}")
+    ]
+
+    keyboard.append(nav_row)
+
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 async def send_clean_message(user_id, text, reply_markup=None):
@@ -703,17 +726,21 @@ async def handle(message: Message):
 
         records = days_off_sheet.get_all_values()
         user_id_str = str(user_id)
-        month = datetime.now().month
+        today = datetime.now().date()
 
         user_days = []
         for r in records:
             if len(r) > 2 and r[2] == user_id_str:
                 try:
-                    off_date = datetime.strptime(r[1], "%d.%m.%Y")
-                    if off_date.month == month:
+                    off_date = datetime.strptime(r[1], "%d.%m.%Y").date()
+                    if off_date >= today:
                         user_days.append(r)
                 except:
                     pass
+
+        user_days.sort(key=lambda r: datetime.strptime(r[1], "%d.%m.%Y"))
+
+
 
         if not user_days:
             await send_clean_message(user_id, "У тебя пока нет выходных", reply_markup=days_keyboard)
@@ -723,7 +750,8 @@ async def handle(message: Message):
         for r in user_days:
             text += f"{r[1]}\n"
 
-        text += f"\nОсталось: {6 - len(user_days)}"
+        text += f"\nБудущих выходных: {len(user_days)}"
+
         await send_clean_message(user_id, text, reply_markup=days_keyboard)
         return
 
@@ -733,17 +761,20 @@ async def handle(message: Message):
 
         records = days_off_sheet.get_all_values()
         user_id_str = str(user_id)
-        month = datetime.now().month
+        today = datetime.now().date()
 
         user_days = []
         for r in records:
             if len(r) > 2 and r[2] == user_id_str:
                 try:
-                    off_date = datetime.strptime(r[1], "%d.%m.%Y")
-                    if off_date.month == month:
+                    off_date = datetime.strptime(r[1], "%d.%m.%Y").date()
+                    if off_date >= today:
                         user_days.append(r)
                 except:
                     pass
+
+        user_days.sort(key=lambda r: datetime.strptime(r[1], "%d.%m.%Y"))
+
 
         if not user_days:
             await send_clean_message(user_id, "У тебя нет выходных для отмены", reply_markup=days_keyboard)
@@ -909,11 +940,25 @@ async def handle(message: Message):
 
 
 
-    
-
 @dp.callback_query(F.data == "ignore")
 async def ignore_click(callback: CallbackQuery):
     await callback.answer("Недоступно", show_alert=False)
+
+
+@dp.callback_query(F.data.startswith("month_"))
+async def change_month(callback: CallbackQuery):
+    await callback.answer()
+
+    data = callback.data.split("_")
+    month = int(data[1])
+    year = int(data[2])
+
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=generate_calendar(year, month)
+        )
+    except:
+        pass
     
 @dp.callback_query(F.data.startswith("day_"))
 async def select_day(callback: CallbackQuery):
@@ -925,7 +970,8 @@ async def select_day(callback: CallbackQuery):
 
     day = int(data[1])
     month = int(data[2])
-    year = datetime.now().year
+    year = int(data[3])
+
 
     selected_date = datetime(year, month, day)
 
@@ -938,10 +984,11 @@ async def select_day(callback: CallbackQuery):
         if len(r) > 2 and r[2] == user_id_str:
             try:
                 off_date = datetime.strptime(r[1], "%d.%m.%Y")
-                if off_date.month == month:
+                if off_date.month == month and off_date.year == year:
                     user_days.append(r)
             except:
                 pass
+
 
 
     if len(user_days) >= 6:
@@ -1149,6 +1196,7 @@ async def block_user(message: Message):
 async def unblock_user(message: Message):
     if message.from_user.id not in [ADMIN_ID, OWNER_ID]:
         return
+
 
     try:
         user_id = int(message.text.split()[1])
