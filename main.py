@@ -37,7 +37,8 @@ days_off_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6m
 users_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").worksheet("Users")
 settings_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").worksheet("Settings")
 active_breaks_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").worksheet("ActiveBreaks")
-blocked_users_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").worksheet("BlockedUsers")
+shifts_sheet = client.open_by_key("1KUxWRxmHeCPB1xtTzs1AlwVTggfrqa6kyVm1pijy6mg").worksheet("Shifts")
+
 
 
 bot = Bot(token=TOKEN)
@@ -76,6 +77,7 @@ def sync_user_record(user):
 
 
 break_data = {}
+shift_data = {}
 waiting_time = set()
 users = set()
 calendar_messages = {}
@@ -97,6 +99,8 @@ except:
 # 🔹 ГЛАВНОЕ МЕНЮ
 main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
+        [KeyboardButton(text="Начал смену")],
+        [KeyboardButton(text="Закончил смену")],
         [KeyboardButton(text="Перерывы")],
         [KeyboardButton(text="Выходные")],
         [KeyboardButton(text="Зарплата")],
@@ -104,6 +108,7 @@ main_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+
 
 # 🔹 ПЕРЕРЫВЫ
 break_keyboard = ReplyKeyboardMarkup(
@@ -554,6 +559,7 @@ async def handle(message: Message):
     user_id = message.from_user.id
 
     if message.text in [
+        "Начал смену", "Закончил смену",
         "Перерывы", "Выходные", "Зарплата", "Мой профиль",
         "Назад",
         "Начать перерыв", "Закончить перерыв",
@@ -563,11 +569,77 @@ async def handle(message: Message):
         "Моя зарплата"
     ]:
 
+
         try:
             await message.delete()
         except:
             pass
 
+    if message.text == "Начал смену":
+        waiting_time.discard(user_id)
+        salary_waiting.pop(user_id, None)
+
+        if user_id in shift_data:
+            await send_clean_message(user_id, "❗ У тебя уже начата смена", reply_markup=main_keyboard)
+            return
+
+        shift_data[user_id] = {
+            "start": datetime.now(),
+            "name": message.from_user.full_name,
+            "username": message.from_user.username
+        }
+
+        now_str = datetime.now().strftime("%H:%M:%S")
+
+        text = (
+            f"🟢 Начал смену\n"
+            f"{message.from_user.full_name}\n"
+            f"@{message.from_user.username if message.from_user.username else 'без username'}\n"
+            f"{now_str}"
+        )
+
+        await bot.send_message(ADMIN_ID, text)
+        await bot.send_message(OWNER_ID, text)
+
+        await send_clean_message(user_id, "✅ Смена начата", reply_markup=main_keyboard)
+        return
+
+    if message.text == "Закончил смену":
+        waiting_time.discard(user_id)
+        salary_waiting.pop(user_id, None)
+
+        if user_id not in shift_data:
+            await send_clean_message(user_id, "❗ У тебя нет активной смены", reply_markup=main_keyboard)
+            return
+
+        start_time = shift_data[user_id]["start"]
+        end_time = datetime.now()
+
+        shifts_sheet.append_row([
+            end_time.strftime("%d.%m.%Y"),
+            message.from_user.full_name,
+            user_id,
+            message.from_user.username or "без username",
+            start_time.strftime("%H:%M:%S"),
+            end_time.strftime("%H:%M:%S")
+        ])
+
+        text = (
+            f"🔴 Закончил смену\n"
+            f"{message.from_user.full_name}\n"
+            f"@{message.from_user.username if message.from_user.username else 'без username'}\n"
+            f"{end_time.strftime('%H:%M:%S')}"
+        )
+
+        await bot.send_message(ADMIN_ID, text)
+        await bot.send_message(OWNER_ID, text)
+
+        del shift_data[user_id]
+
+        await send_clean_message(user_id, "✅ Смена завершена", reply_markup=main_keyboard)
+        return
+
+    
     if message.text == "Перерывы":
         waiting_time.discard(user_id)
         salary_waiting.pop(user_id, None)
